@@ -1,1 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Secure Upload Pipeline - Checkpoint 3
 
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures:
+      - arm64
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - UploadQueuePolicy
+    Properties:
+      BucketName: !Sub "secure-upload-pipeline-uploads-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue: !GetAtt UploadQueue.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+                  - Name: suffix
+                    Value: .jpg
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteUploadsAfter7Days
+            Status: Enabled
+            ExpirationInDays: 7
+
+  RecordsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: secure-upload-pipeline-records
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: image_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: image_id
+          KeyType: HASH
+
+  UploadDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: secure-upload-pipeline-dlq
+
+  UploadQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: secure-upload-pipeline-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt UploadDLQ.Arn
+        maxReceiveCount: 3
+
+  UploadQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref UploadQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowS3SendMessage
+            Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt UploadQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Sub "arn:aws:s3:::secure-upload-pipeline-uploads-${AWS::AccountId}-${AWS::Region}"
+
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: secure-upload-pipeline-get-upload-url
+      CodeUri: ../lambda/get-upload-url/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          UPLOAD_BUCKET: !Ref UploadBucket
+          RECORDS_TABLE: !Ref RecordsTable
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "${UploadBucket.Arn}/uploads/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt RecordsTable.Arn
+      Events:
+        GetUploadUrlApi:
+          Type: Api
+          Properties:
+            Path: /upload-url
+            Method: post
+
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: secure-upload-pipeline-processor
+      CodeUri: ../lambda/processor/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          RECORDS_TABLE: !Ref RecordsTable
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt RecordsTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt UploadQueue.Arn
+      Events:
+        UploadQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt UploadQueue.Arn
+            BatchSize: 1
+
+  GetUploadUrlLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${GetUploadUrlFunction}"
+      RetentionInDays: 7
+
+  ProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProcessorFunction}"
+      RetentionInDays: 7
+
+Outputs:
+  ApiUrl:
+    Description: API endpoint for creating upload URLs
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/upload-url"
+
+  UploadBucketName:
+    Description: Private S3 upload bucket
+    Value: !Ref UploadBucket
+
+  RecordsTableName:
+    Description: DynamoDB records table
+    Value: !Ref RecordsTable
+
+  UploadQueueUrl:
+    Description: SQS upload queue
+    Value: !Ref UploadQueue
+
+  UploadDLQUrl:
+    Description: SQS dead-letter queue
+    Value: !Ref UploadDLQ
