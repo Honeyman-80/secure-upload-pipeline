@@ -82,3 +82,66 @@ Verified:
 * The pre-signed URL uses Lambda role permissions.
 * Users upload directly to S3.
 * API Gateway provides the public endpoint for Lambda.
+
+# Checkpoint 2
+
+## Architecture
+
+User
+
+→ API Gateway
+
+→ Lambda (secure-upload-pipeline-get-upload-url)
+
+├── Generate pre-signed URL
+
+├── Write DynamoDB record
+
+└── Return upload URL
+
+→ User uploads directly to S3
+
+## Resources Created
+
+### DynamoDB
+
+Table:
+
+secure-upload-pipeline-records
+
+Partition Key:
+
+image_id
+
+Billing Mode:
+
+On-Demand
+
+## Lambda Enhancements
+
+Added DynamoDB integration.
+
+Lambda now:
+
+* Generates image_id
+* Generates pre-signed URL
+* Creates DynamoDB record
+* Returns upload URL
+
+## Validation Performed
+
+Verified:
+
+* DynamoDB record created successfully
+* Upload URL generated successfully
+* File uploaded successfully to S3
+* Object appears in uploads/ prefix
+* Record appears in DynamoDB
+
+## Lessons Learned
+
+* S3 stores files, not application metadata.
+* DynamoDB stores upload metadata.
+* image_id is a better primary key than file_name.
+* One user can have many uploads, so user_id alone is not a good partition key.
+* Metadata and file storage are commonly separated in cloud architectures.
