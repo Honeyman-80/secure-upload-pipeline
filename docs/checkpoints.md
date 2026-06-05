@@ -145,3 +145,79 @@ Verified:
 * image_id is a better primary key than file_name.
 * One user can have many uploads, so user_id alone is not a good partition key.
 * Metadata and file storage are commonly separated in cloud architectures.
+
+# Checkpoint 3
+
+## Architecture
+
+S3 upload
+
+→ SQS queue
+
+→ Processor Lambda
+
+→ DynamoDB status update
+
+## Resources Created
+
+### SQS
+
+Main queue:
+
+secure-upload-pipeline-queue
+
+Dead-letter queue:
+
+secure-upload-pipeline-dlq
+
+Redrive policy:
+
+- Max receives: 3
+- Failed messages move to DLQ
+
+### Lambda
+
+Processor function:
+
+secure-upload-pipeline-processor
+
+Responsibilities:
+
+- Read SQS messages
+- Parse S3 upload event
+- Extract image_id from S3 object key
+- Update DynamoDB record status to UPLOADED
+
+### S3 Event Notification
+
+Bucket:
+
+secure-upload-pipeline-uploads-654375431894-us-east-1-an
+
+Event:
+
+- Object created
+- Prefix: uploads/
+- Suffix: .jpg
+
+Destination:
+
+secure-upload-pipeline-queue
+
+## Validation Performed
+
+Verified:
+
+- File uploaded to S3
+- S3 sent event to SQS
+- SQS triggered processor Lambda
+- Processor Lambda updated DynamoDB
+- Record status changed to UPLOADED
+
+## Lessons Learned
+
+- SQS buffers events between S3 and Lambda.
+- Queues protect systems from broken or slow processors.
+- A DLQ is just another queue used for failed messages.
+- The receiving service controls access with a resource policy.
+- SQS queue policy allowed S3 events to be accepted.
