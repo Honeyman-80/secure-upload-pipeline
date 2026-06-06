@@ -250,6 +250,8 @@ Issue discovered:
 * Get Upload URL Lambda initially failed because the code referenced a hardcoded DynamoDB table name.
 * Updated Lambda code to use the RECORDS_TABLE environment variable.
 * Rebuilt and redeployed successfully.
+* CloudFormation cannot delete a non-empty S3 bucket.
+* Application-generated data may need manual cleanup before stack deletion.
 
 Important lesson:
 
