@@ -1,14 +1,18 @@
 import json
-import boto3
+import os
 from datetime import datetime, timezone
 
+import boto3
+
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("secure-upload-pipeline-records")
+TABLE_NAME = os.environ["RECORDS_TABLE"]
+
+table = dynamodb.Table(TABLE_NAME)
 
 def lambda_handler(event, context):
     for record in event["Records"]:
         message_body = json.loads(record["body"])
-        
+
         for s3_record in message_body["Records"]:
             s3_key = s3_record["s3"]["object"]["key"]
             image_id = s3_key.replace("uploads/", "").replace(".jpg", "")
