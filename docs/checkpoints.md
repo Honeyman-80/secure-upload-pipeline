@@ -221,3 +221,31 @@ Verified:
 - A DLQ is just another queue used for failed messages.
 - The receiving service controls access with a resource policy.
 - SQS queue policy allowed S3 events to be accepted.
+
+## Template Validation
+
+Created and deployed a test rebuild template:
+
+cloudformation/checkpoint-templates/checkpoint-3-test.yaml
+
+Test stack:
+
+secure-upload-pipeline-test
+
+Validated:
+
+- SAM build succeeded
+- CloudFormation stack deployed successfully
+- API Gateway output URL was created
+- Lambda initially failed due to hardcoded DynamoDB table name
+- Fixed Lambda code to use environment variable RECORDS_TABLE
+- Redeployed from GitHub/SAM
+- API returned upload URL successfully
+
+Important lesson:
+
+The template can deploy successfully even if the application code still has a runtime error. Deployment success does not always mean application success.
+
+Rebuild status:
+
+Checkpoint 3 can now be rebuilt from GitHub using SAM/CloudFormation.
