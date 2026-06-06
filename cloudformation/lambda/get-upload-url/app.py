@@ -1,6 +1,6 @@
 import json
-import uuid
 import os
+import uuid
 from datetime import datetime, timezone
 
 import boto3
@@ -13,9 +13,14 @@ TABLE_NAME = os.environ["RECORDS_TABLE"]
 
 table = dynamodb.Table(TABLE_NAME)
 
+
 def lambda_handler(event, context):
+    claims = event["requestContext"]["authorizer"]["claims"]
+    user_id = claims["sub"]
+    user_email = claims.get("email", "")
+
     image_id = str(uuid.uuid4())
-    key = f"uploads/{image_id}.jpg"
+    key = f"uploads/{user_id}/{image_id}.jpg"
     created_at = datetime.now(timezone.utc).isoformat()
 
     upload_url = s3.generate_presigned_url(
@@ -31,6 +36,8 @@ def lambda_handler(event, context):
     table.put_item(
         Item={
             "image_id": image_id,
+            "user_id": user_id,
+            "user_email": user_email,
             "s3_key": key,
             "status": "UPLOAD_URL_CREATED",
             "created_at": created_at
@@ -39,8 +46,12 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
+        "headers": {
+            "Content-Type": "application/json"
+        },
         "body": json.dumps({
             "image_id": image_id,
+            "user_id": user_id,
             "key": key,
             "upload_url": upload_url
         })
