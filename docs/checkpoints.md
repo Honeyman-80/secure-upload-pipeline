@@ -261,3 +261,153 @@ Rebuild status:
 
 Checkpoint 3 has been successfully rebuilt and fully validated using SAM and CloudFormation.
 
+# Checkpoint 4
+
+## Architecture
+
+User
+
+→ Cognito Hosted Login
+
+→ JWT Token
+
+→ API Gateway Cognito Authorizer
+
+→ Lambda (secure-upload-pipeline-get-upload-url)
+
+├── Extract user_id from Cognito claims
+
+├── Create DynamoDB record
+
+├── Generate user-specific S3 key
+
+└── Return pre-signed upload URL
+
+→ User uploads directly to S3
+
+→ S3 Event Notification
+
+→ SQS Queue
+
+→ Processor Lambda
+
+→ DynamoDB status update
+
+User
+
+→ Cognito JWT
+
+→ API Gateway Cognito Authorizer
+
+→ Lambda (secure-upload-pipeline-get-records)
+
+→ DynamoDB GSI Query
+
+→ Return only authenticated user's records
+
+## Resources Created
+
+### Cognito
+
+User Pool:
+
+secure-upload-pipeline
+
+Features:
+
+- Hosted Login
+- Email verification
+- Authorization Code Grant
+- JWT tokens
+
+### API Gateway
+
+Authorizer:
+
+secure-upload-pipeline-authorizer
+
+Protected Endpoints:
+
+- POST /upload-url
+- GET /records
+
+### DynamoDB
+
+Global Secondary Index:
+
+user_id-created_at-index
+
+Partition Key:
+
+user_id
+
+## Lambda Enhancements
+
+Get Upload URL Lambda:
+
+- Reads Cognito claims
+- Extracts user_id
+- Extracts user_email
+- Creates user-specific S3 keys
+
+Get Records Lambda:
+
+- Reads Cognito claims
+- Queries DynamoDB by user_id
+- Returns only authenticated user's records
+
+Processor Lambda:
+
+Updated to support:
+
+uploads/{user_id}/{image_id}.jpg
+
+## Validation Performed
+
+Verified:
+
+- Cognito login successful
+- JWT token generation successful
+- Unauthenticated requests blocked
+- Authenticated requests succeed
+- /upload-url protected by Cognito
+- /records protected by Cognito
+- DynamoDB records contain user_id
+- DynamoDB records contain user_email
+- S3 objects stored under user-specific prefixes
+- Processor Lambda successfully updates status to UPLOADED
+- /records returns only authenticated user's records
+
+## Lessons Learned
+
+- Authentication identifies who a user is.
+- Authorization controls what a user can access.
+- API Gateway Cognito Authorizers validate JWTs before Lambda executes.
+- User identity can be passed through the application using Cognito claims.
+- DynamoDB access patterns often require GSIs.
+- Architectural changes can require updates throughout the pipeline.
+- Changing S3 key structure broke the Processor Lambda because image_id extraction logic depended on the original key format.
+
+## Rebuild Status
+
+Checkpoint 4 has been successfully validated end-to-end.
+
+Validated flow:
+
+Cognito Login
+
+→ JWT
+
+→ Protected API
+
+→ User-specific S3 Upload
+
+→ S3 Event
+
+→ SQS
+
+→ Processor Lambda
+
+→ DynamoDB Status Update
+
+→ Protected Record Retrieval
