@@ -1,5 +1,6 @@
 import json
 import uuid
+import os
 from datetime import datetime, timezone
 
 import boto3
@@ -7,8 +8,8 @@ import boto3
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 
-BUCKET_NAME = "secure-upload-pipeline-uploads-654375431894-us-east-1-an"
-TABLE_NAME = "secure-upload-pipeline-records"
+BUCKET_NAME = os.environ["UPLOAD_BUCKET"]
+TABLE_NAME = os.environ["RECORDS_TABLE"]
 
 table = dynamodb.Table(TABLE_NAME)
 
