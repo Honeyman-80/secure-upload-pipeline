@@ -234,18 +234,28 @@ secure-upload-pipeline-test
 
 Validated:
 
-- SAM build succeeded
-- CloudFormation stack deployed successfully
-- API Gateway output URL was created
-- Lambda initially failed due to hardcoded DynamoDB table name
-- Fixed Lambda code to use environment variable RECORDS_TABLE
-- Redeployed from GitHub/SAM
-- API returned upload URL successfully
+* SAM build succeeded
+* CloudFormation stack deployed successfully
+* API Gateway endpoint created successfully
+* Upload URL generated successfully
+* DynamoDB record created successfully
+* File uploaded successfully to S3
+* S3 event notification triggered successfully
+* SQS message delivered successfully
+* Processor Lambda executed successfully
+* DynamoDB status updated to UPLOADED
+
+Issue discovered:
+
+* Get Upload URL Lambda initially failed because the code referenced a hardcoded DynamoDB table name.
+* Updated Lambda code to use the RECORDS_TABLE environment variable.
+* Rebuilt and redeployed successfully.
 
 Important lesson:
 
-The template can deploy successfully even if the application code still has a runtime error. Deployment success does not always mean application success.
+The template can deploy successfully even if the application code still contains runtime errors. Infrastructure validation and application validation are separate activities.
 
 Rebuild status:
 
-Checkpoint 3 can now be rebuilt from GitHub using SAM/CloudFormation.
+Checkpoint 3 has been successfully rebuilt and fully validated using SAM and CloudFormation.
+
